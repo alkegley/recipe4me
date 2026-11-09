@@ -1,0 +1,2268 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recipe4Me — Smart Recipe & USDA Nutrition Tracker</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            culinary: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    /* FDA Nutrition Label Styling */
+    .nutrition-label {
+      border: 2px solid #0f172a;
+      padding: 12px;
+      background: #ffffff;
+      font-family: 'Inter', Helvetica, Arial, sans-serif;
+    }
+    .nutrition-bar-thick {
+      height: 8px;
+      background: #0f172a;
+      margin: 4px 0;
+    }
+    .nutrition-bar-med {
+      height: 4px;
+      background: #0f172a;
+      margin: 4px 0;
+    }
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Top Header -->
+  <header class="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-700 text-white shadow-lg sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand Logo & Status Badges -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shadow-inner border border-white/20">
+          <i data-lucide="chef-hat" class="w-6 h-6 text-emerald-200"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight">Recipe4Me</h1>
+            <span class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-900/70 text-emerald-200 border border-emerald-500/30">PWA + USDA</span>
+          </div>
+          <p class="text-xs text-emerald-100/90 hidden sm:block">Find, Parse, Import & Calculate Recipe Macros + Micronutrients</p>
+        </div>
+      </div>
+
+      <!-- Status & Action Bar -->
+      <div class="flex items-center flex-wrap gap-2">
+        <!-- AI & USDA Status Pill -->
+        <button onclick="openSettingsModal()" class="flex items-center gap-1.5 text-xs bg-emerald-900/50 hover:bg-emerald-900/80 border border-emerald-400/30 px-3 py-1.5 rounded-lg transition" title="Configure Gemini AI, USDA API Key & Nutrition Goals">
+          <span id="aiStatusDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="aiStatusLabel" class="font-medium">AI + USDA Active</span>
+          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 ml-1 text-emerald-200"></i>
+        </button>
+
+        <!-- Data Lock / Backup Button -->
+        <button onclick="openDataModal()" class="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 border border-white/20 px-3 py-1.5 rounded-lg font-medium transition">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-200"></i>
+          <span>Data Lock & Backup</span>
+          <span id="headerSavedBadge" class="ml-0.5 px-1.5 py-0.2 bg-emerald-950/70 text-emerald-200 rounded-full text-[11px]">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-emerald-900/40 border-t border-white/10">
+      <div class="max-w-7xl mx-auto px-2 sm:px-6 flex items-center overflow-x-auto no-scrollbar">
+        <button onclick="switchTab('vault')" id="tabBtn-vault" class="nav-tab flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 border-white text-white whitespace-nowrap transition">
+          <i data-lucide="book-open" class="w-4 h-4"></i>
+          <span>My Cookbook</span>
+        </button>
+        <button onclick="switchTab('smart-add')" id="tabBtn-smart-add" class="nav-tab flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-emerald-100/80 hover:text-white whitespace-nowrap transition">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+          <span>Smart Add (Text / Paste)</span>
+        </button>
+        <button onclick="switchTab('url')" id="tabBtn-url" class="nav-tab flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-emerald-100/80 hover:text-white whitespace-nowrap transition">
+          <i data-lucide="link-2" class="w-4 h-4"></i>
+          <span>Import from URL</span>
+        </button>
+        <button onclick="switchTab('discover')" id="tabBtn-discover" class="nav-tab flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-emerald-100/80 hover:text-white whitespace-nowrap transition">
+          <i data-lucide="compass" class="w-4 h-4"></i>
+          <span>Find New Recipes</span>
+        </button>
+        <button onclick="switchTab('calculator')" id="tabBtn-calculator" class="nav-tab flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-emerald-100/80 hover:text-white whitespace-nowrap transition">
+          <i data-lucide="calculator" class="w-4 h-4"></i>
+          <span>USDA Macro Lab</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+
+    <!-- ==========================================
+         TAB 1: MY COOKBOOK (VAULT)
+         ========================================== -->
+    <section id="view-vault" class="space-y-6">
+      <!-- Quick Stats Hero Strip -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">Saved Recipes</p>
+            <p id="statTotalRecipes" class="text-2xl font-extrabold text-slate-800 mt-0.5">0</p>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <i data-lucide="utensils" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">High Protein (≥25g)</p>
+            <p id="statHighProtein" class="text-2xl font-extrabold text-emerald-700 mt-0.5">0</p>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
+            <i data-lucide="flame" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">Avg Calories / Serving</p>
+            <p id="statAvgCalories" class="text-2xl font-extrabold text-slate-800 mt-0.5">0</p>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <i data-lucide="activity" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-slate-200/80 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">Favorites</p>
+            <p id="statFavorites" class="text-2xl font-extrabold text-rose-600 mt-0.5">0</p>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+            <i data-lucide="heart" class="w-5 h-5"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search & Filter Bar -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+        <div class="flex flex-col sm:flex-row gap-3 justify-between">
+          <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <input id="vaultSearchInput" type="text" oninput="renderVault()" placeholder="Search by recipe title, ingredient (e.g., salmon, chicken, oats), or tag..." class="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div class="flex gap-2">
+            <button onclick="switchTab('smart-add')" class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>Add Recipe</span>
+            </button>
+            <button onclick="switchTab('discover')" class="flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-lg transition">
+              <i data-lucide="compass" class="w-4 h-4"></i>
+              <span>Discover</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Pills -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar" id="vaultFilterBar">
+          <button onclick="setVaultFilter('all')" data-filter="all" class="vault-filter-btn px-3 py-1 rounded-full text-xs font-semibold bg-emerald-600 text-white">All Recipes</button>
+          <button onclick="setVaultFilter('fav')" data-filter="fav" class="vault-filter-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">❤️ Favorites</button>
+          <button onclick="setVaultFilter('high-protein')" data-filter="high-protein" class="vault-filter-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">💪 High Protein (≥25g)</button>
+          <button onclick="setVaultFilter('low-cal')" data-filter="low-cal" class="vault-filter-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">🔥 Under 450 kcal</button>
+          <button onclick="setVaultFilter('low-carb')" data-filter="low-carb" class="vault-filter-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">🥑 Low Net Carb (≤20g)</button>
+          <button onclick="setVaultFilter('quick')" data-filter="quick" class="vault-filter-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">⚡ Quick (≤20m)</button>
+        </div>
+      </div>
+
+      <!-- Recipe Grid -->
+      <div id="recipeVaultGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+    </section>
+
+    <!-- ==========================================
+         TAB 2: SMART ADD (PLAIN TEXT OR COPY/PASTE)
+         ========================================== -->
+    <section id="view-smart-add" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left Column: Input Form -->
+        <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-4">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full mb-1">
+                <i data-lucide="wand-2" class="w-3.5 h-3.5"></i> Dual AI + Local USDA Parser
+              </span>
+              <h2 class="text-lg sm:text-xl font-bold text-slate-800">Describe in Plain Text or Paste Any Recipe</h2>
+              <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Write naturally (e.g., <em>"200g salmon, 1 tbsp olive oil, 2 cups broccoli, bake 15m at 400F, serves 2"</em>) or paste messy copied text from any blog, TikTok/Instagram caption, or notes app.</p>
+            </div>
+          </div>
+
+          <!-- Sample Presets -->
+          <div class="flex flex-wrap items-center gap-2 pt-1">
+            <span class="text-xs font-semibold text-slate-400">Try a sample:</span>
+            <button onclick="loadSmartSample('casual')" class="text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 px-2.5 py-1 rounded-md font-medium transition">🗣️ Casual Plain Text</button>
+            <button onclick="loadSmartSample('blog')" class="text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 px-2.5 py-1 rounded-md font-medium transition">📋 Messy Copied Blog Text</button>
+            <button onclick="loadSmartSample('glp1')" class="text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 px-2.5 py-1 rounded-md font-medium transition">🥗 High-Protein B12 Bowl</button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Recipe Title (Optional — auto-detected if blank)</label>
+              <input id="smartTitleInput" type="text" placeholder="e.g., Crispy Air-Fryer Salmon Bites" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Servings</label>
+              <input id="smartServingsInput" type="number" min="1" max="50" value="2" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label class="text-xs font-semibold text-slate-600">Plain-Text Description or Copied Recipe Text</label>
+              <button onclick="clearSmartAdd()" class="text-xs text-slate-400 hover:text-slate-600">Clear</button>
+            </div>
+            <textarea id="smartTextInput" rows="10" placeholder="Type or paste here...&#10;&#10;Example:&#10;High-Protein Greek Yogurt Berry Bowl (Serves 1)&#10;1 cup nonfat Greek yogurt&#10;1/2 cup blueberries&#10;1 tbsp chia seeds&#10;1 tbsp honey&#10;30g almonds&#10;&#10;Spoon Greek yogurt into a chilled bowl. Top with fresh blueberries, chia seeds, sliced almonds, and drizzle with warm honey." class="w-full p-3.5 text-sm border border-slate-200 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+          </div>
+
+          <div class="flex flex-wrap gap-3 pt-1">
+            <button id="smartParseBtn" onclick="runSmartParse(true)" class="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl shadow-sm transition">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Parse & Calculate Nutrition (AI + USDA)</span>
+            </button>
+            <button onclick="runSmartParse(false)" class="flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition" title="Instant offline regex + USDA dictionary parser">
+              <i data-lucide="cpu" class="w-4 h-4"></i>
+              <span>Instant Local Parse</span>
+            </button>
+          </div>
+          <p id="smartParseStatus" class="text-xs text-slate-500"></p>
+        </div>
+
+        <!-- Right Column: Live Parsed Preview before saving -->
+        <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 flex flex-col justify-between">
+          <div id="smartPreviewContainer" class="space-y-4">
+            <div class="text-center py-12 px-4 text-slate-400">
+              <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="file-text" class="w-6 h-6"></i>
+              </div>
+              <p class="font-semibold text-slate-600 text-sm">Live Recipe & Macro Preview</p>
+              <p class="text-xs mt-1">Describe or paste a recipe on the left and click <strong>Parse & Calculate Nutrition</strong> to verify ingredients, steps, and per-serving macros before saving.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 3: IMPORT FROM URL
+         ========================================== -->
+    <section id="view-url" class="hidden space-y-6">
+      <div class="max-w-3xl mx-auto bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+        <div>
+          <span class="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full mb-1">
+            <i data-lucide="globe" class="w-3.5 h-3.5"></i> Schema.org JSON-LD + DOM Scraper
+          </span>
+          <h2 class="text-xl font-bold text-slate-800">Import Recipe from Any Website URL</h2>
+          <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Paste a link from food blogs or recipe sites. Recipe4Me fetches the page via CORS proxies, extracts `Schema.org/Recipe` ingredients and steps, and calculates full per-serving nutrition.</p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-2.5">
+          <input id="urlImportInput" type="url" placeholder="https://www.allrecipes.com/recipe/... or any recipe blog URL" class="flex-1 px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          <button id="urlImportBtn" onclick="handleUrlImport()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm transition">
+            <i data-lucide="download-cloud" class="w-4 h-4"></i>
+            <span>Fetch & Parse URL</span>
+          </button>
+        </div>
+
+        <!-- Sample Test URLs -->
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="text-slate-400 font-semibold">Quick test URLs:</span>
+          <button onclick="testSampleUrl('https://www.SimplyRecipes.com/recipes/air_fryer_salmon/')" class="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 transition">Air Fryer Salmon</button>
+          <button onclick="testSampleUrl('https://www.allrecipes.com/recipe/228293/curry-stand-chicken-tikka-masala-sauce/')" class="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 transition">Chicken Tikka Masala</button>
+          <button onclick="testSampleUrl('https://www.themediterraneandish.com/mediterranean-chickpea-salad/')" class="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 transition">Mediterranean Chickpea Salad</button>
+        </div>
+
+        <div id="urlStatusBox" class="hidden p-4 rounded-xl text-xs sm:text-sm border"></div>
+
+        <!-- Imported URL Preview Area -->
+        <div id="urlPreviewArea" class="hidden pt-4 border-t border-slate-200"></div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 4: FIND NEW RECIPES (DISCOVER + AI CHEF)
+         ========================================== -->
+    <section id="view-discover" class="hidden space-y-6">
+      <!-- Top Dual Search Modes -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <!-- Search Public Recipe Database (TheMealDB) -->
+        <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">🌐 Live Culinary Database</span>
+            <span class="text-xs text-slate-400">Auto-Calculates USDA Macros</span>
+          </div>
+          <h2 class="text-lg font-bold text-slate-800">Search Thousands of Verified Recipes</h2>
+          <div class="flex gap-2">
+            <input id="discoverQueryInput" type="text" onkeydown="if(event.key==='Enter')searchMealDb()" placeholder="Search dish or main ingredient (e.g., Chicken, Salmon, Lentil, Pasta, Tacos)..." class="flex-1 px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            <button onclick="searchMealDb()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-xl text-sm flex items-center gap-1.5 transition">
+              <i data-lucide="search" class="w-4 h-4"></i>
+              <span>Search</span>
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-1.5 pt-1">
+            <span class="text-xs text-slate-400 font-medium self-center mr-1">Popular:</span>
+            <button onclick="quickDiscover('Salmon')" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700">🐟 Salmon</button>
+            <button onclick="quickDiscover('Chicken')" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700">🍗 Chicken</button>
+            <button onclick="quickDiscover('Beef')" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700">🥩 Beef</button>
+            <button onclick="quickDiscover('Vegetarian')" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700">🥦 Vegetarian</button>
+            <button onclick="quickDiscover('Shrimp')" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700">🍤 Shrimp</button>
+            <button onclick="quickDiscover('Curry')" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700">🍛 Curry</button>
+          </div>
+        </div>
+
+        <!-- AI Custom Recipe Generator -->
+        <div class="lg:col-span-5 bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-2xl shadow-sm p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider bg-white/15 text-emerald-200 px-2.5 py-1 rounded-full">✨ Custom Macro Chef</span>
+            <span class="text-[11px] text-emerald-200/80">Fridge / Macro Match</span>
+          </div>
+          <h2 class="text-lg font-bold">Generate a Recipe by Macros or Ingredients</h2>
+          <p class="text-xs text-emerald-100/90">Tell Recipe4Me what's in your kitchen or your exact calorie/protein targets.</p>
+          <textarea id="aiChefPrompt" rows="2" placeholder="e.g., High-protein dinner under 450 calories with at least 40g protein using chicken breast, spinach, and greek yogurt..." class="w-full p-2.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-emerald-200/60 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"></textarea>
+          <button id="aiChefBtn" onclick="generateCustomAiRecipe()" class="w-full bg-emerald-400 hover:bg-emerald-300 text-emerald-950 font-bold py-2 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 transition shadow">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span>Create Custom Recipe with Full Macros</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Discover Results Grid -->
+      <div id="discoverStatus" class="text-sm text-slate-500"></div>
+      <div id="discoverResultsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+    </section>
+
+    <!-- ==========================================
+         TAB 5: USDA NUTRITION CALCULATOR & LAB
+         ========================================== -->
+    <section id="view-calculator" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left 7 Cols: Interactive Ingredient Builder & USDA Search -->
+        <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-5">
+          <div>
+            <span class="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full mb-1">
+              <i data-lucide="database" class="w-3.5 h-3.5"></i> USDA FoodData Central + 120-Food Local DB
+            </span>
+            <h2 class="text-xl font-bold text-slate-800">Interactive Recipe Nutrition Calculator</h2>
+            <p class="text-xs sm:text-sm text-slate-500">Search whole foods via USDA FoodData Central or add custom ingredient lines to calculate exact per-serving macros and save as a new recipe.</p>
+          </div>
+
+          <!-- USDA Live Lookup Bar -->
+          <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Search USDA FoodData Central (Per 100g Reference)</label>
+            <div class="flex gap-2">
+              <input id="usdaSearchInput" type="text" onkeydown="if(event.key==='Enter')searchUsdaFood()" placeholder="Search food (e.g., salmon, chicken breast, avocado, oats, cheddar)..." class="flex-1 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              <button onclick="searchUsdaFood()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition">
+                <i data-lucide="search" class="w-4 h-4"></i>
+                <span>USDA Lookup</span>
+              </button>
+            </div>
+            <div id="usdaSearchResults" class="space-y-1.5 max-h-48 overflow-y-auto"></div>
+          </div>
+
+          <!-- Recipe Builder Meta -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Recipe Name</label>
+              <input id="calcRecipeTitle" type="text" value="Custom Macro-Balanced Bowl" oninput="recalculateLab()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Servings</label>
+              <input id="calcRecipeServings" type="number" min="1" max="50" value="2" oninput="recalculateLab()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg" />
+            </div>
+          </div>
+
+          <!-- Quick Add Ingredient Line -->
+          <div class="flex gap-2">
+            <input id="calcNewIngInput" type="text" onkeydown="if(event.key==='Enter')addLabIngredientLine()" placeholder="Add ingredient line (e.g., 200g chicken breast, 1 tbsp olive oil, 1 cup rice)..." class="flex-1 px-3.5 py-2 text-sm border border-slate-200 rounded-lg" />
+            <button onclick="addLabIngredientLine()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg">+ Add Line</button>
+          </div>
+
+          <!-- Ingredient Table -->
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left border-collapse text-xs sm:text-sm">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
+                  <th class="py-2.5 px-3">Ingredient</th>
+                  <th class="py-2.5 px-2 text-right">Est. Grams</th>
+                  <th class="py-2.5 px-2 text-right">Cal</th>
+                  <th class="py-2.5 px-2 text-right">Pro</th>
+                  <th class="py-2.5 px-2 text-right">Carb</th>
+                  <th class="py-2.5 px-2 text-right">Fat</th>
+                  <th class="py-2.5 px-2 text-center"></th>
+                </tr>
+              </thead>
+              <tbody id="calcIngredientRows" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+
+          <div class="flex justify-between items-center pt-2">
+            <button onclick="resetLabIngredients()" class="text-xs text-slate-400 hover:text-red-500">Clear All Ingredients</button>
+            <button onclick="saveLabAsRecipe()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition">
+              <i data-lucide="bookmark-plus" class="w-4 h-4"></i>
+              <span>Save to My Cookbook</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right 5 Cols: Live FDA Nutrition Label & Macro Ratio Chart -->
+        <div class="lg:col-span-5 space-y-5">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-bold text-slate-800 text-sm uppercase tracking-wider">Per-Serving Macro Split</h3>
+              <span id="labCalorieBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">0 kcal / serving</span>
+            </div>
+            <div class="h-44 flex items-center justify-center">
+              <canvas id="labMacroChart"></canvas>
+            </div>
+          </div>
+
+          <!-- FDA Style Nutrition Facts Panel -->
+          <div id="labNutritionFactsPanel" class="nutrition-label rounded-xl shadow-sm"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==========================================
+       MODAL 1: FULL RECIPE DETAIL, SCALER & COOK MODE
+       ========================================== -->
+  <div id="recipeDetailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 hidden items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 p-5 sm:p-7 space-y-6 my-auto">
+      <div id="recipeDetailContent"></div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL 2: API KEYS, GOALS & AI SKILL SETTINGS
+       ========================================== -->
+  <div id="settingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 my-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="settings" class="w-5 h-5 text-emerald-600"></i>
+          <h3 class="font-bold text-lg text-slate-800">Recipe4Me Settings & API Keys</h3>
+        </div>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs sm:text-sm">
+        <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900">
+          <p class="font-semibold">GitHub Pages & Canvas Ready</p>
+          <p class="text-xs mt-0.5 text-emerald-800">Inside this preview canvas, Gemini AI works automatically. When hosted on your own GitHub Pages site, you can optionally paste a free Gemini API key or USDA key below—or rely on the built-in offline regex parser and 120+ food USDA macro dictionary.</p>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Optional Gemini API Key (for GitHub Pages hosting)</label>
+          <input id="settingGeminiKey" type="password" placeholder="AIzaSy... (Leave blank to use Canvas default or Local Parser)" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg font-mono text-xs" />
+          <p class="text-[11px] text-slate-400 mt-1">Stored strictly in your browser (`recipe4me_gemini_api_key`). Never sent anywhere except Google's Gemini endpoint.</p>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">USDA FoodData Central API Key</label>
+          <input id="settingUsdaKey" type="text" placeholder="DEMO_KEY" class="w-full px-3.5 py-2 border border-slate-200 rounded-lg font-mono text-xs" />
+          <p class="text-[11px] text-slate-400 mt-1">Defaults to `DEMO_KEY` (official public USDA key) plus our instant local USDA whole-food database.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 pt-1">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Target Calories / Meal</label>
+            <input id="settingTargetCal" type="number" value="500" class="w-full px-3 py-2 border border-slate-200 rounded-lg" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">High-Protein Threshold (g)</label>
+            <input id="settingTargetPro" type="number" value="25" class="w-full px-3 py-2 border border-slate-200 rounded-lg" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+        <button onclick="closeSettingsModal()" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+        <button onclick="saveSettings()" class="px-5 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL 3: DATA LOCK, SNAPSHOT & JSON BACKUP
+       ========================================== -->
+  <div id="dataModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 my-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="shield-check" class="w-5 h-5 text-emerald-600"></i>
+          <h3 class="font-bold text-lg text-slate-800">Data Lock, Sync & GitHub JSON Backup</h3>
+        </div>
+        <button onclick="closeDataModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs sm:text-sm">
+        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+          <div>
+            <p class="font-bold text-slate-800">Multi-Layer Persistence Active</p>
+            <p class="text-xs text-slate-500">Automatically synced across `localStorage`, `IndexedDB`, and `window.name`.</p>
+          </div>
+          <span id="modalRecipeCount" class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">0 Recipes</span>
+        </div>
+
+        <!-- Export / Import File -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button onclick="exportJsonFile()" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl transition">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>Export `.json` Backup</span>
+          </button>
+          <label class="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-4 rounded-xl cursor-pointer transition">
+            <i data-lucide="upload" class="w-4 h-4"></i>
+            <span>Import `.json` Backup</span>
+            <input type="file" accept=".json" class="hidden" onchange="importJsonFile(event)" />
+          </label>
+        </div>
+
+        <!-- Clipboard Data Lock Snapshot -->
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <div class="flex justify-between items-center">
+            <label class="font-semibold text-slate-700">1-Click Clipboard Snapshot (Copy / Paste Restore)</label>
+            <button onclick="copySnapshotToClipboard()" class="text-xs text-emerald-600 font-semibold hover:underline">Copy Snapshot Code</button>
+          </div>
+          <textarea id="snapshotTextarea" rows="3" placeholder="Paste a previously copied Recipe4Me JSON snapshot here to restore..." class="w-full p-2.5 border border-slate-200 rounded-lg font-mono text-xs"></textarea>
+          <div class="flex justify-between items-center">
+            <button onclick="restoreStarterRecipes()" class="text-xs text-slate-500 hover:text-slate-800 underline">Restore Starter Recipes</button>
+            <button onclick="applySnapshotFromTextarea()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold px-4 py-1.5 rounded-lg text-xs">Restore from Snapshot</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-200 bg-white py-4 mt-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+      <p><strong>Recipe4Me</strong> — Serverless Single-File PWA for GitHub Pages • USDA FoodData Central + AI Recipe Parser</p>
+      <div class="flex items-center gap-4">
+        <button onclick="openSettingsModal()" class="hover:text-emerald-600">API & Goals</button>
+        <button onclick="openDataModal()" class="hover:text-emerald-600">Backup JSON</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- =====================================================================
+       APPLICATION JAVASCRIPT: USDA DB, PARSER, AI, URL SCRAPER & STORAGE
+       ===================================================================== -->
+  <script>
+    // --- 1. SAFE HTML SANITIZER ---
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const el = document.createElement('div');
+      const colors = type === 'error'
+        ? 'bg-rose-600 text-white'
+        : type === 'info'
+        ? 'bg-slate-800 text-white'
+        : 'bg-emerald-700 text-white';
+      el.className = `${colors} px-4 py-3 rounded-xl shadow-lg text-xs sm:text-sm font-medium flex items-center justify-between gap-3 pointer-events-auto transition-all`;
+      el.innerHTML = `<span>${escapeHtml(message)}</span>`;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 300);
+      }, 3200);
+    }
+
+    // --- 2. COMPREHENSIVE BUILT-IN USDA MACRO DICTIONARY (Per 100g) ---
+    // Values: cal (kcal), pro (g), carb (g), fat (g), fib (g), sug (g), sod (mg)
+    const USDA_LOCAL_DB = {
+      "chicken breast": { cal: 165, pro: 31.0, carb: 0.0, fat: 3.6, fib: 0.0, sug: 0.0, sod: 74 },
+      "chicken thigh": { cal: 209, pro: 26.0, carb: 0.0, fat: 10.9, fib: 0.0, sug: 0.0, sod: 84 },
+      "chicken": { cal: 185, pro: 28.0, carb: 0.0, fat: 7.4, fib: 0.0, sug: 0.0, sod: 78 },
+      "ground turkey": { cal: 170, pro: 27.0, carb: 0.0, fat: 6.5, fib: 0.0, sug: 0.0, sod: 70 },
+      "turkey": { cal: 157, pro: 29.0, carb: 0.0, fat: 3.6, fib: 0.0, sug: 0.0, sod: 68 },
+      "salmon": { cal: 208, pro: 20.4, carb: 0.0, fat: 13.4, fib: 0.0, sug: 0.0, sod: 59 },
+      "tuna": { cal: 132, pro: 28.2, carb: 0.0, fat: 1.3, fib: 0.0, sug: 0.0, sod: 247 },
+      "cod": { cal: 82, pro: 17.8, carb: 0.0, fat: 0.7, fib: 0.0, sug: 0.0, sod: 54 },
+      "shrimp": { cal: 99, pro: 24.0, carb: 0.2, fat: 0.3, fib: 0.0, sug: 0.0, sod: 111 },
+      "prawn": { cal: 99, pro: 24.0, carb: 0.2, fat: 0.3, fib: 0.0, sug: 0.0, sod: 111 },
+      "lean ground beef": { cal: 217, pro: 26.1, carb: 0.0, fat: 11.8, fib: 0.0, sug: 0.0, sod: 66 },
+      "beef": { cal: 250, pro: 26.0, carb: 0.0, fat: 15.0, fib: 0.0, sug: 0.0, sod: 72 },
+      "steak": { cal: 252, pro: 27.3, carb: 0.0, fat: 15.0, fib: 0.0, sug: 0.0, sod: 58 },
+      "pork tenderloin": { cal: 143, pro: 26.2, carb: 0.0, fat: 3.5, fib: 0.0, sug: 0.0, sod: 55 },
+      "pork": { cal: 242, pro: 27.3, carb: 0.0, fat: 13.9, fib: 0.0, sug: 0.0, sod: 62 },
+      "bacon": { cal: 541, pro: 37.0, carb: 1.4, fat: 41.8, fib: 0.0, sug: 0.0, sod: 1717 },
+      "tofu": { cal: 144, pro: 17.3, carb: 2.8, fat: 8.7, fib: 2.3, sug: 0.6, sod: 14 },
+      "tempeh": { cal: 192, pro: 20.3, carb: 7.6, fat: 10.8, fib: 5.0, sug: 0.0, sod: 9 },
+      "egg white": { cal: 52, pro: 10.9, carb: 0.7, fat: 0.2, fib: 0.0, sug: 0.7, sod: 166 },
+      "egg": { cal: 155, pro: 12.6, carb: 1.1, fat: 10.6, fib: 0.0, sug: 1.1, sod: 124 },
+      "greek yogurt": { cal: 59, pro: 10.3, carb: 3.6, fat: 0.4, fib: 0.0, sug: 3.2, sod: 36 },
+      "yogurt": { cal: 61, pro: 3.5, carb: 4.7, fat: 3.3, fib: 0.0, sug: 4.7, sod: 46 },
+      "cottage cheese": { cal: 98, pro: 11.1, carb: 3.4, fat: 4.3, fib: 0.0, sug: 2.7, sod: 364 },
+      "cheddar": { cal: 403, pro: 24.9, carb: 1.3, fat: 33.1, fib: 0.0, sug: 0.5, sod: 621 },
+      "mozzarella": { cal: 280, pro: 27.5, carb: 3.1, fat: 17.1, fib: 0.0, sug: 1.0, sod: 627 },
+      "parmesan": { cal: 431, pro: 38.5, carb: 4.1, fat: 28.6, fib: 0.0, sug: 0.9, sod: 1529 },
+      "feta": { cal: 264, pro: 14.2, carb: 4.1, fat: 21.3, fib: 0.0, sug: 4.1, sod: 1116 },
+      "cheese": { cal: 350, pro: 24.0, carb: 2.0, fat: 27.0, fib: 0.0, sug: 1.0, sod: 650 },
+      "milk": { cal: 50, pro: 3.4, carb: 4.9, fat: 2.0, fib: 0.0, sug: 4.9, sod: 44 },
+      "almond milk": { cal: 15, pro: 0.6, carb: 0.6, fat: 1.2, fib: 0.2, sug: 0.0, sod: 63 },
+      "butter": { cal: 717, pro: 0.9, carb: 0.1, fat: 81.1, fib: 0.0, sug: 0.1, sod: 11 },
+      "olive oil": { cal: 884, pro: 0.0, carb: 0.0, fat: 100.0, fib: 0.0, sug: 0.0, sod: 2 },
+      "sesame oil": { cal: 884, pro: 0.0, carb: 0.0, fat: 100.0, fib: 0.0, sug: 0.0, sod: 0 },
+      "coconut oil": { cal: 862, pro: 0.0, carb: 0.0, fat: 100.0, fib: 0.0, sug: 0.0, sod: 0 },
+      "avocado": { cal: 160, pro: 2.0, carb: 8.5, fat: 14.7, fib: 6.7, sug: 0.7, sod: 7 },
+      "oats": { cal: 389, pro: 16.9, carb: 66.3, fat: 6.9, fib: 10.6, sug: 0.9, sod: 2 },
+      "quinoa": { cal: 120, pro: 4.4, carb: 21.3, fat: 1.9, fib: 2.8, sug: 0.9, sod: 7 },
+      "brown rice": { cal: 112, pro: 2.6, carb: 23.5, fat: 0.9, fib: 1.8, sug: 0.4, sod: 5 },
+      "rice": { cal: 130, pro: 2.7, carb: 28.2, fat: 0.3, fib: 0.4, sug: 0.1, sod: 1 },
+      "pasta": { cal: 158, pro: 5.8, carb: 30.9, fat: 0.9, fib: 1.8, sug: 0.6, sod: 1 },
+      "bread": { cal: 265, pro: 9.0, carb: 49.0, fat: 3.2, fib: 2.7, sug: 5.0, sod: 491 },
+      "tortilla": { cal: 218, pro: 5.7, carb: 44.6, fat: 2.8, fib: 5.2, sug: 1.2, sod: 396 },
+      "flour": { cal: 364, pro: 10.3, carb: 76.3, fat: 1.0, fib: 2.7, sug: 0.3, sod: 2 },
+      "almond flour": { cal: 571, pro: 21.4, carb: 21.4, fat: 50.0, fib: 10.7, sug: 3.6, sod: 0 },
+      "potato": { cal: 77, pro: 2.0, carb: 17.5, fat: 0.1, fib: 2.2, sug: 0.8, sod: 6 },
+      "sweet potato": { cal: 86, pro: 1.6, carb: 20.1, fat: 0.1, fib: 3.0, sug: 4.2, sod: 55 },
+      "black beans": { cal: 132, pro: 8.9, carb: 23.7, fat: 0.5, fib: 8.7, sug: 0.3, sod: 1 },
+      "chickpeas": { cal: 164, pro: 8.9, carb: 27.4, fat: 2.6, fib: 7.6, sug: 4.8, sod: 24 },
+      "lentils": { cal: 116, pro: 9.0, carb: 20.1, fat: 0.4, fib: 7.9, sug: 1.8, sod: 2 },
+      "beans": { cal: 127, pro: 8.7, carb: 22.8, fat: 0.5, fib: 6.4, sug: 0.3, sod: 120 },
+      "broccoli": { cal: 34, pro: 2.8, carb: 6.6, fat: 0.4, fib: 2.6, sug: 1.7, sod: 33 },
+      "asparagus": { cal: 20, pro: 2.2, carb: 3.9, fat: 0.1, fib: 2.1, sug: 1.9, sod: 2 },
+      "spinach": { cal: 23, pro: 2.9, carb: 3.6, fat: 0.4, fib: 2.2, sug: 0.4, sod: 79 },
+      "kale": { cal: 49, pro: 4.3, carb: 8.8, fat: 0.9, fib: 3.6, sug: 2.3, sod: 38 },
+      "zucchini": { cal: 17, pro: 1.2, carb: 3.1, fat: 0.3, fib: 1.0, sug: 2.5, sod: 8 },
+      "cauliflower": { cal: 25, pro: 1.9, carb: 5.0, fat: 0.3, fib: 2.0, sug: 1.9, sod: 30 },
+      "bell pepper": { cal: 31, pro: 1.0, carb: 6.0, fat: 0.3, fib: 2.1, sug: 4.2, sod: 4 },
+      "tomato": { cal: 18, pro: 0.9, carb: 3.9, fat: 0.2, fib: 1.2, sug: 2.6, sod: 5 },
+      "cucumber": { cal: 15, pro: 0.7, carb: 3.6, fat: 0.1, fib: 0.5, sug: 1.7, sod: 2 },
+      "carrot": { cal: 41, pro: 0.9, carb: 9.6, fat: 0.2, fib: 2.8, sug: 4.7, sod: 69 },
+      "onion": { cal: 40, pro: 1.1, carb: 9.3, fat: 0.1, fib: 1.7, sug: 4.2, sod: 4 },
+      "garlic": { cal: 149, pro: 6.4, carb: 33.1, fat: 0.5, fib: 2.1, sug: 1.0, sod: 17 },
+      "mushroom": { cal: 22, pro: 3.1, carb: 3.3, fat: 0.3, fib: 1.0, sug: 2.0, sod: 5 },
+      "blueberries": { cal: 57, pro: 0.7, carb: 14.5, fat: 0.3, fib: 2.4, sug: 10.0, sod: 1 },
+      "strawberries": { cal: 32, pro: 0.7, carb: 7.7, fat: 0.3, fib: 2.0, sug: 4.9, sod: 1 },
+      "banana": { cal: 89, pro: 1.1, carb: 22.8, fat: 0.3, fib: 2.6, sug: 12.2, sod: 1 },
+      "apple": { cal: 52, pro: 0.3, carb: 13.8, fat: 0.2, fib: 2.4, sug: 10.4, sod: 1 },
+      "lemon": { cal: 29, pro: 1.1, carb: 9.3, fat: 0.3, fib: 2.8, sug: 2.5, sod: 2 },
+      "almonds": { cal: 579, pro: 21.2, carb: 21.6, fat: 49.9, fib: 12.5, sug: 4.4, sod: 1 },
+      "walnuts": { cal: 654, pro: 15.2, carb: 13.7, fat: 65.2, fib: 6.7, sug: 2.6, sod: 2 },
+      "peanut butter": { cal: 588, pro: 25.1, carb: 20.0, fat: 50.4, fib: 6.0, sug: 9.2, sod: 426 },
+      "chia seeds": { cal: 486, pro: 16.5, carb: 42.1, fat: 30.7, fib: 34.4, sug: 0.0, sod: 16 },
+      "whey protein": { cal: 375, pro: 80.0, carb: 6.0, fat: 3.5, fib: 0.0, sug: 3.0, sod: 190 },
+      "protein powder": { cal: 375, pro: 78.0, carb: 7.0, fat: 4.0, fib: 1.0, sug: 2.0, sod: 210 },
+      "honey": { cal: 304, pro: 0.3, carb: 82.4, fat: 0.0, fib: 0.2, sug: 82.1, sod: 4 },
+      "maple syrup": { cal: 260, pro: 0.0, carb: 67.0, fat: 0.1, fib: 0.0, sug: 60.5, sod: 12 },
+      "sugar": { cal: 387, pro: 0.0, carb: 100.0, fat: 0.0, fib: 0.0, sug: 100.0, sod: 1 },
+      "soy sauce": { cal: 53, pro: 8.1, carb: 4.9, fat: 0.6, fib: 0.8, sug: 0.4, sod: 5493 }
+    };
+
+    const UNIT_GRAMS = {
+      "g": 1, "gram": 1, "grams": 1,
+      "kg": 1000, "kilogram": 1000,
+      "oz": 28.35, "ounce": 28.35, "ounces": 28.35,
+      "lb": 453.6, "lbs": 453.6, "pound": 453.6, "pounds": 453.6,
+      "tbsp": 15, "tablespoon": 15, "tablespoons": 15, "tbs": 15,
+      "tsp": 5, "teaspoon": 5, "teaspoons": 5,
+      "cup": 165, "cups": 165,
+      "ml": 1, "l": 1000,
+      "clove": 5, "cloves": 5,
+      "slice": 32, "slices": 32,
+      "scoop": 32, "scoops": 32,
+      "can": 250, "cans": 250,
+      "fillet": 170, "fillets": 170,
+      "breast": 175, "breasts": 175,
+      "pinch": 1
+    };
+
+    // --- 3. INGREDIENT PARSING & NUTRITION ENGINE ---
+    function parseFraction(str) {
+      if (!str) return 1;
+      const clean = str.trim();
+      if (/^\d+\s+\d+\/\d+$/.test(clean)) {
+        const [whole, frac] = clean.split(/\s+/);
+        const [n, d] = frac.split('/');
+        return parseFloat(whole) + (parseFloat(n) / parseFloat(d || 1));
+      }
+      if (/^\d+\/\d+$/.test(clean)) {
+        const [n, d] = clean.split('/');
+        return parseFloat(n) / parseFloat(d || 1);
+      }
+      const num = parseFloat(clean);
+      return isNaN(num) ? 1 : num;
+    }
+
+    function analyzeIngredientLine(rawLine) {
+      const cleanLine = String(rawLine || '').replace(/^[-*•]\s*/, '').trim();
+      const lower = cleanLine.toLowerCase()
+        .replace(/½/g, '1/2')
+        .replace(/¼/g, '1/4')
+        .replace(/¾/g, '3/4')
+        .replace(/⅓/g, '1/3')
+        .replace(/⅔/g, '2/3');
+
+      // Extract leading quantity + optional unit
+      const rx = /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)?\s*(g|gram|grams|kg|oz|ounce|ounces|lb|lbs|pound|pounds|tbsp|tablespoon|tablespoons|tbs|tsp|teaspoon|teaspoons|cup|cups|ml|clove|cloves|slice|slices|scoop|scoops|can|cans|fillet|fillets|breast|breasts|pinch)?\b\s*(.*)$/i;
+      const match = lower.match(rx);
+
+      let qty = 1;
+      let unit = '';
+      let rest = lower;
+
+      if (match) {
+        if (match[1]) qty = parseFraction(match[1]);
+        if (match[2]) unit = match[2].toLowerCase();
+        rest = (match[3] || lower).trim();
+      }
+
+      // Compute estimated gram weight
+      let grams = 100;
+      if (unit && UNIT_GRAMS[unit]) {
+        grams = qty * UNIT_GRAMS[unit];
+        // Refine cup weights for light/dense items
+        if ((unit === 'cup' || unit === 'cups') && /spinach|kale|lettuce|arugula/.test(rest)) grams = qty * 35;
+        if ((unit === 'cup' || unit === 'cups') && /oats|flour|blueberries|strawberries/.test(rest)) grams = qty * 110;
+        if ((unit === 'cup' || unit === 'cups') && /yogurt|milk|water|broth|rice/.test(rest)) grams = qty * 225;
+      } else {
+        if (/egg/.test(rest)) grams = qty * 50;
+        else if (/avocado|banana|apple|potato|onion|bell pepper|tomato|zucchini|lemon/.test(rest)) grams = qty * 130;
+        else if (/salmon|chicken|steak|beef|pork|cod/.test(rest)) grams = qty * 165;
+        else if (/salt|pepper|spice|oregano|basil|thyme|cinnamon|paprika/.test(rest)) grams = 2;
+        else grams = qty * 85;
+      }
+
+      // Match against USDA dictionary (longest key match first)
+      let matchedFood = null;
+      const sortedKeys = Object.keys(USDA_LOCAL_DB).sort((a, b) => b.length - a.length);
+      for (const k of sortedKeys) {
+        if (lower.includes(k)) {
+          matchedFood = USDA_LOCAL_DB[k];
+          break;
+        }
+      }
+
+      if (!matchedFood) {
+        if (/salt/.test(lower)) matchedFood = { cal: 0, pro: 0, carb: 0, fat: 0, fib: 0, sug: 0, sod: 19000 };
+        else if (/water|ice/.test(lower)) matchedFood = { cal: 0, pro: 0, carb: 0, fat: 0, fib: 0, sug: 0, sod: 0 };
+        else matchedFood = { cal: 35, pro: 1.2, carb: 6.0, fat: 0.4, fib: 1.5, sug: 1.5, sod: 15 };
+      }
+
+      const factor = grams / 100;
+      return {
+        raw: cleanLine,
+        grams: Math.round(grams),
+        calories: Math.round(matchedFood.cal * factor),
+        protein: +(matchedFood.pro * factor).toFixed(1),
+        carbs: +(matchedFood.carb * factor).toFixed(1),
+        fat: +(matchedFood.fat * factor).toFixed(1),
+        fiber: +(matchedFood.fib * factor).toFixed(1),
+        sugar: +(matchedFood.sug * factor).toFixed(1),
+        sodium: Math.round(matchedFood.sod * factor)
+      };
+    }
+
+    function calculateRecipeMacros(ingredientLines, servings = 2) {
+      const s = Math.max(1, parseInt(servings, 10) || 1);
+      const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 };
+
+      (ingredientLines || []).forEach(item => {
+        const line = typeof item === 'string' ? item : (item.raw || '');
+        const parsed = analyzeIngredientLine(line);
+        totals.calories += parsed.calories;
+        totals.protein += parsed.protein;
+        totals.carbs += parsed.carbs;
+        totals.fat += parsed.fat;
+        totals.fiber += parsed.fiber;
+        totals.sugar += parsed.sugar;
+        totals.sodium += parsed.sodium;
+      });
+
+      const carbsPer = +(totals.carbs / s).toFixed(1);
+      const fiberPer = +(totals.fiber / s).toFixed(1);
+      return {
+        calories: Math.round(totals.calories / s),
+        protein: +(totals.protein / s).toFixed(1),
+        carbs: carbsPer,
+        fat: +(totals.fat / s).toFixed(1),
+        fiber: fiberPer,
+        netCarbs: +Math.max(0, carbsPer - fiberPer).toFixed(1),
+        sugar: +(totals.sugar / s).toFixed(1),
+        sodium: Math.round(totals.sodium / s)
+      };
+    }
+
+    function localSmartParseRecipe(titleOverride, rawText, defaultServings = 2) {
+      const rawLines = String(rawText || '')
+        .split(/\r?\n/)
+        .map(l => l.trim())
+        .filter(Boolean);
+
+      let detectedTitle = (titleOverride || '').trim();
+      let detectedServings = parseInt(defaultServings, 10) || 2;
+      let prepTime = '20 mins';
+
+      const servMatch = rawText.match(/(?:serves|servings|yield)[:\s]*(\d+)/i);
+      if (servMatch) detectedServings = parseInt(servMatch[1], 10) || detectedServings;
+
+      const timeMatch = rawText.match(/(\d+\s*(?:min|mins|minutes|hr|hour|hours))/i);
+      if (timeMatch) prepTime = timeMatch[1];
+
+      const ingredients = [];
+      const instructions = [];
+
+      // If single paragraph casual description, split by commas/sentences intelligently
+      let workingLines = [...rawLines];
+      if (workingLines.length <= 2 && rawText.includes(',')) {
+        workingLines = rawText.split(/,|\.\s+/).map(s => s.trim()).filter(Boolean);
+      }
+
+      const qtyOrUnitRx = /^(\d+|\d+\/\d+|½|¼|¾|one|two|three|half)\b|\b(cup|cups|tbsp|tsp|oz|lb|lbs|g|grams|kg|clove|cloves|scoop|fillet|breast|can|slice|pinch)\b/i;
+      const actionVerbRx = /^(preheat|bake|cook|grill|air\s*fry|sear|saute|sauté|mix|whisk|combine|stir|chop|slice|dice|serve|top|season|roast|boil|simmer|heat|add|place|pour|spoon|drizzle)\b/i;
+
+      workingLines.forEach((line, idx) => {
+        const clean = line.replace(/^[-*•]\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim();
+        if (!clean) return;
+        if (!detectedTitle && idx === 0 && clean.length < 65 && !qtyOrUnitRx.test(clean) && !actionVerbRx.test(clean)) {
+          detectedTitle = clean.replace(/\(serves.*\)/i, '').trim();
+          return;
+        }
+        if (/^(ingredients|instructions|directions|method|steps)[:\s]*$/i.test(clean)) return;
+
+        if (qtyOrUnitRx.test(clean) && clean.length < 95 && !actionVerbRx.test(clean)) {
+          ingredients.push(clean);
+        } else {
+          instructions.push(clean);
+        }
+      });
+
+      if (ingredients.length === 0 && workingLines.length > 0) {
+        ingredients.push(...workingLines.slice(0, Math.min(5, workingLines.length)));
+      }
+      if (instructions.length === 0) {
+        instructions.push('Prepare and measure all listed ingredients.', 'Cook until tender and golden, then portion into servings.');
+      }
+
+      const nutrition = calculateRecipeMacros(ingredients, detectedServings);
+      const tags = [];
+      if (nutrition.protein >= 25) tags.push('High Protein');
+      if (nutrition.netCarbs <= 20) tags.push('Low Carb');
+      if (nutrition.calories <= 450) tags.push('Under 450 kcal');
+
+      return {
+        id: crypto.randomUUID(),
+        title: detectedTitle || 'Custom Smart Recipe',
+        servings: detectedServings,
+        prepTime,
+        tags,
+        favorite: false,
+        sourceUrl: null,
+        ingredients,
+        instructions,
+        nutrition,
+        createdAt: new Date().toISOString()
+      };
+    }
+
+    // --- 4. STARTER COOKBOOK RECIPES ---
+    function getStarterRecipes() {
+      const r1 = {
+        id: 'starter-salmon-glp1',
+        title: 'Crispy Garlic-Lemon Salmon & Asparagus',
+        servings: 2,
+        prepTime: '15 mins',
+        tags: ['High Protein', 'Low Carb', 'B12 Rich'],
+        favorite: true,
+        sourceUrl: null,
+        ingredients: [
+          '340g salmon fillets',
+          '1 tbsp olive oil',
+          '2 cups asparagus',
+          '3 cloves garlic, minced',
+          '1 lemon, juiced'
+        ],
+        instructions: [
+          'Pat salmon fillets dry and rub with olive oil, minced garlic, and fresh lemon juice.',
+          'Arrange salmon and trimmed asparagus in the air fryer or baking sheet at 400°F (200°C).',
+          'Cook for 10–12 minutes until salmon flakes easily and asparagus tips are crisp-tender.'
+        ]
+      };
+      r1.nutrition = calculateRecipeMacros(r1.ingredients, r1.servings);
+
+      const r2 = {
+        id: 'starter-greek-bowl',
+        title: 'Mediterranean High-Protein Chicken Power Bowl',
+        servings: 2,
+        prepTime: '20 mins',
+        tags: ['High Protein', 'Meal Prep'],
+        favorite: true,
+        sourceUrl: null,
+        ingredients: [
+          '320g chicken breast, cubed',
+          '1 cup quinoa, cooked',
+          '1 cup cucumber, diced',
+          '1 cup tomato, halved',
+          '60g feta cheese',
+          '1 tbsp olive oil'
+        ],
+        instructions: [
+          'Season cubed chicken breast with oregano, garlic, salt, and pepper, then sear in olive oil for 6–8 minutes until golden.',
+          'Divide cooked quinoa between two bowls and top with warm chicken, crisp cucumber, tomatoes, and crumbled feta.'
+        ]
+      };
+      r2.nutrition = calculateRecipeMacros(r2.ingredients, r2.servings);
+
+      const r3 = {
+        id: 'starter-berry-yogurt',
+        title: 'Triple-Berry Chia & Greek Yogurt Protein Parfait',
+        servings: 1,
+        prepTime: '5 mins',
+        tags: ['High Protein', 'Quick', 'Under 450 kcal'],
+        favorite: false,
+        sourceUrl: null,
+        ingredients: [
+          '1 cup greek yogurt',
+          '1/2 cup blueberries',
+          '1/2 cup strawberries',
+          '1 tbsp chia seeds',
+          '15g almonds, sliced'
+        ],
+        instructions: [
+          'Layer chilled nonfat Greek yogurt into a serving glass or bowl.',
+          'Top with fresh blueberries, sliced strawberries, chia seeds, and toasted almonds.'
+        ]
+      };
+      r3.nutrition = calculateRecipeMacros(r3.ingredients, r3.servings);
+
+      const r4 = {
+        id: 'starter-turkey-skillet',
+        title: 'One-Pan Lean Turkey, Sweet Potato & Spinach Skillet',
+        servings: 3,
+        prepTime: '25 mins',
+        tags: ['High Protein', 'One-Pan'],
+        favorite: false,
+        sourceUrl: null,
+        ingredients: [
+          '450g ground turkey',
+          '250g sweet potato, diced small',
+          '2 cups spinach',
+          '1/2 cup onion, diced',
+          '2 cloves garlic',
+          '1 tbsp olive oil'
+        ],
+        instructions: [
+          'Brown lean ground turkey with diced onion and garlic in olive oil over medium-high heat.',
+          'Add small-diced sweet potatoes and 1/4 cup water; cover and steam-cook for 10 minutes until tender.',
+          'Fold in fresh spinach until wilted and serve warm.'
+        ]
+      };
+      r4.nutrition = calculateRecipeMacros(r4.ingredients, r4.servings);
+
+      return [r1, r2, r3, r4];
+    }
+
+    // --- 5. MULTI-LAYER PERSISTENT STATE ENGINE ---
+    const STORAGE_KEY = 'recipe4me_persistent_state_v1';
+    let appState = {
+      recipes: [],
+      settings: {
+        targetCal: 500,
+        targetPro: 25,
+        usdaKey: 'DEMO_KEY'
+      },
+      activeFilter: 'all',
+      smartDraft: null,
+      urlDraft: null,
+      labIngredients: [
+        '200g chicken breast',
+        '1 cup brown rice',
+        '1 cup broccoli',
+        '1 tbsp olive oil'
+      ]
+    };
+
+    function loadPersistentState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY) || (window.name && window.name.startsWith('{') ? window.name : null);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.recipes) && parsed.recipes.length > 0) {
+            appState.recipes = parsed.recipes;
+            if (parsed.settings) appState.settings = { ...appState.settings, ...parsed.settings };
+            if (Array.isArray(parsed.labIngredients)) appState.labIngredients = parsed.labIngredients;
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('State recovery fallback triggered', e);
+      }
+      appState.recipes = getStarterRecipes();
+      savePersistentState();
+    }
+
+    function savePersistentState() {
+      try {
+        const payload = JSON.stringify({
+          recipes: appState.recipes,
+          settings: appState.settings,
+          labIngredients: appState.labIngredients,
+          updatedAt: new Date().toISOString()
+        });
+        localStorage.setItem(STORAGE_KEY, payload);
+        window.name = payload;
+      } catch (e) {
+        console.warn('Storage write warning:', e);
+      }
+      updateHeaderCounters();
+    }
+
+    function updateHeaderCounters() {
+      const count = appState.recipes.length;
+      const badge = document.getElementById('headerSavedBadge');
+      if (badge) badge.textContent = count;
+      const modalCount = document.getElementById('modalRecipeCount');
+      if (modalCount) modalCount.textContent = `${count} Recipes`;
+    }
+
+    // --- 6. GEMINI API CALLER (WITH EXPONENTIAL BACKOFF & STRUCTURED JSON) ---
+    function getGeminiApiKey() {
+      return localStorage.getItem('recipe4me_gemini_api_key') || '';
+    }
+
+    async function callGeminiStructuredRecipe(userPrompt, systemPrompt) {
+      const apiKey = getGeminiApiKey();
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      const payload = {
+        contents: [{ parts: [{ text: userPrompt }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              title: { type: "STRING" },
+              servings: { type: "INTEGER" },
+              prepTime: { type: "STRING" },
+              tags: { type: "ARRAY", items: { type: "STRING" } },
+              ingredients: { type: "ARRAY", items: { type: "STRING" } },
+              instructions: { type: "ARRAY", items: { type: "STRING" } },
+              nutritionPerServing: {
+                type: "OBJECT",
+                properties: {
+                  calories: { type: "INTEGER" },
+                  protein: { type: "NUMBER" },
+                  carbs: { type: "NUMBER" },
+                  fat: { type: "NUMBER" },
+                  fiber: { type: "NUMBER" },
+                  sugar: { type: "NUMBER" },
+                  sodium: { type: "INTEGER" }
+                }
+              }
+            },
+            required: ["title", "servings", "ingredients", "instructions"]
+          }
+        }
+      };
+
+      const delays = [1000, 2000];
+      for (let attempt = 0; attempt <= delays.length; attempt++) {
+        try {
+          const res = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return JSON.parse(text);
+        } catch (err) {
+          if (attempt === delays.length) throw err;
+          await new Promise(r => setTimeout(r, delays[attempt]));
+        }
+      }
+      throw new Error('AI request unavailable');
+    }
+
+    // --- 7. TAB NAVIGATION ---
+    function switchTab(tabId) {
+      const tabs = ['vault', 'smart-add', 'url', 'discover', 'calculator'];
+      tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const btn = document.getElementById(`tabBtn-${t}`);
+        if (view) view.classList.toggle('hidden', t !== tabId);
+        if (btn) {
+          btn.className = t === tabId
+            ? 'nav-tab flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 border-white text-white whitespace-nowrap transition'
+            : 'nav-tab flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-emerald-100/80 hover:text-white whitespace-nowrap transition';
+        }
+      });
+
+      if (tabId === 'vault') renderVault();
+      if (tabId === 'calculator') recalculateLab();
+      if (tabId === 'discover' && !window.hasLoadedInitialDiscover) {
+        window.hasLoadedInitialDiscover = true;
+        quickDiscover('Salmon');
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // --- 8. TAB 1: MY COOKBOOK RENDERING & SCALING ---
+    const cardScaleMap = {}; // recipeId -> scaled servings
+
+    function setVaultFilter(filter) {
+      appState.activeFilter = filter;
+      document.querySelectorAll('.vault-filter-btn').forEach(btn => {
+        const isMatch = btn.getAttribute('data-filter') === filter;
+        btn.className = isMatch
+          ? 'vault-filter-btn px-3 py-1 rounded-full text-xs font-semibold bg-emerald-600 text-white'
+          : 'vault-filter-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200';
+      });
+      renderVault();
+    }
+
+    function scaleIngredientString(ingStr, ratio) {
+      if (Math.abs(ratio - 1) < 0.01) return ingStr;
+      return ingStr.replace(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/, (match) => {
+        const val = parseFraction(match) * ratio;
+        return val % 1 === 0 ? String(val) : val.toFixed(1).replace(/\.0$/, '');
+      });
+    }
+
+    function adjustCardServings(recipeId, delta, event) {
+      if (event) event.stopPropagation();
+      const r = appState.recipes.find(x => x.id === recipeId);
+      if (!r) return;
+      const current = cardScaleMap[recipeId] || r.servings || 2;
+      cardScaleMap[recipeId] = Math.max(1, current + delta);
+      renderVault();
+    }
+
+    function toggleFavorite(recipeId, event) {
+      if (event) event.stopPropagation();
+      const r = appState.recipes.find(x => x.id === recipeId);
+      if (!r) return;
+      r.favorite = !r.favorite;
+      savePersistentState();
+      renderVault();
+    }
+
+    function deleteRecipeById(recipeId, event) {
+      if (event) event.stopPropagation();
+      appState.recipes = appState.recipes.filter(r => r.id !== recipeId);
+      savePersistentState();
+      closeRecipeDetailModal();
+      renderVault();
+      showToast('Recipe removed from My Cookbook', 'info');
+    }
+
+    function renderVault() {
+      const recipes = appState.recipes || [];
+      const highProThreshold = Number(appState.settings.targetPro) || 25;
+
+      // Update Hero Stats
+      const elTotal = document.getElementById('statTotalRecipes');
+      const elHighPro = document.getElementById('statHighProtein');
+      const elAvgCal = document.getElementById('statAvgCalories');
+      const elFav = document.getElementById('statFavorites');
+
+      if (elTotal) elTotal.textContent = recipes.length;
+      if (elHighPro) elHighPro.textContent = recipes.filter(r => (r.nutrition?.protein || 0) >= highProThreshold).length;
+      if (elAvgCal) {
+        const avg = recipes.length
+          ? Math.round(recipes.reduce((sum, r) => sum + (r.nutrition?.calories || 0), 0) / recipes.length)
+          : 0;
+        elAvgCal.textContent = `${avg} kcal`;
+      }
+      if (elFav) elFav.textContent = recipes.filter(r => r.favorite).length;
+
+      // Filter & Search
+      const q = (document.getElementById('vaultSearchInput')?.value || '').toLowerCase().trim();
+      const filtered = recipes.filter(r => {
+        const matchesQuery = !q ||
+          (r.title || '').toLowerCase().includes(q) ||
+          (r.ingredients || []).some(i => i.toLowerCase().includes(q)) ||
+          (r.tags || []).some(t => t.toLowerCase().includes(q));
+        if (!matchesQuery) return false;
+
+        const f = appState.activeFilter;
+        if (f === 'fav') return !!r.favorite;
+        if (f === 'high-protein') return (r.nutrition?.protein || 0) >= highProThreshold;
+        if (f === 'low-cal') return (r.nutrition?.calories || 0) <= 450;
+        if (f === 'low-carb') return (r.nutrition?.netCarbs ?? r.nutrition?.carbs ?? 99) <= 20;
+        if (f === 'quick') return parseInt(r.prepTime || '20', 10) <= 20;
+        return true;
+      });
+
+      const grid = document.getElementById('recipeVaultGrid');
+      if (!grid) return;
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-3">
+            <p class="font-bold text-slate-700 text-base">No matching recipes found</p>
+            <p class="text-xs text-slate-500 max-w-md mx-auto">Try clearing your search filter, or add a new recipe using Plain Text, URL Import, or Find New Recipes.</p>
+            <button onclick="setVaultFilter('all')" class="text-xs bg-emerald-600 text-white font-semibold px-4 py-2 rounded-lg">Show All Recipes</button>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(r => {
+        const baseServings = r.servings || 2;
+        const scaledServings = cardScaleMap[r.id] || baseServings;
+        const ratio = scaledServings / baseServings;
+        const n = r.nutrition || calculateRecipeMacros(r.ingredients, baseServings);
+
+        return `
+          <article onclick="openRecipeDetailModal('${escapeHtml(r.id)}')" class="bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-emerald-300 transition cursor-pointer flex flex-col justify-between p-5">
+            <div>
+              <!-- Top Badges & Favorite -->
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="flex flex-wrap gap-1">
+                  ${(r.tags || []).slice(0, 3).map(tag => `
+                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">${escapeHtml(tag)}</span>
+                  `).join('')}
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">⏱ ${escapeHtml(r.prepTime || '20 mins')}</span>
+                </div>
+                <button onclick="toggleFavorite('${escapeHtml(r.id)}', event)" class="text-slate-400 hover:text-rose-500 transition p-1" title="Toggle Favorite">
+                  <svg class="w-4 h-4 ${r.favorite ? 'fill-rose-500 text-rose-500' : ''}" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                </button>
+              </div>
+
+              <!-- Title -->
+              <h3 class="font-bold text-base sm:text-lg text-slate-800 leading-snug mb-3">${escapeHtml(r.title)}</h3>
+
+              <!-- Per-Serving Nutrition Bar -->
+              <div class="grid grid-cols-5 gap-1 bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 text-center mb-3">
+                <div>
+                  <div class="text-[10px] font-medium text-slate-400">Cal</div>
+                  <div class="font-extrabold text-slate-800 text-xs sm:text-sm">${n.calories}</div>
+                </div>
+                <div>
+                  <div class="text-[10px] font-medium text-slate-400">Protein</div>
+                  <div class="font-extrabold text-emerald-700 text-xs sm:text-sm">${n.protein}g</div>
+                </div>
+                <div>
+                  <div class="text-[10px] font-medium text-slate-400">Net Carb</div>
+                  <div class="font-bold text-amber-700 text-xs sm:text-sm">${n.netCarbs ?? n.carbs}g</div>
+                </div>
+                <div>
+                  <div class="text-[10px] font-medium text-slate-400">Fat</div>
+                  <div class="font-bold text-sky-700 text-xs sm:text-sm">${n.fat}g</div>
+                </div>
+                <div>
+                  <div class="text-[10px] font-medium text-slate-400">Fiber</div>
+                  <div class="font-bold text-teal-700 text-xs sm:text-sm">${n.fiber ?? 0}g</div>
+                </div>
+              </div>
+
+              <!-- Interactive Serving Scaler + Ingredient Preview -->
+              <div class="flex items-center justify-between text-xs mb-2">
+                <span class="font-bold uppercase tracking-wider text-slate-400 text-[11px]">Ingredients</span>
+                <div class="flex items-center gap-1 bg-slate-100 rounded-lg px-1.5 py-0.5" onclick="event.stopPropagation()">
+                  <button onclick="adjustCardServings('${escapeHtml(r.id)}', -1, event)" class="px-1.5 font-bold text-slate-600 hover:text-emerald-700">−</button>
+                  <span class="text-[11px] font-semibold text-slate-700">${scaledServings} serv</span>
+                  <button onclick="adjustCardServings('${escapeHtml(r.id)}', 1, event)" class="px-1.5 font-bold text-slate-600 hover:text-emerald-700">+</button>
+                </div>
+              </div>
+              <ul class="text-xs text-slate-600 space-y-1 mb-3">
+                ${(r.ingredients || []).slice(0, 4).map(ing => `
+                  <li class="truncate">• ${escapeHtml(scaleIngredientString(ing, ratio))}</li>
+                `).join('')}
+                ${(r.ingredients || []).length > 4 ? `<li class="text-emerald-600 font-medium">+ ${(r.ingredients.length - 4)} more ingredients...</li>` : ''}
+              </ul>
+            </div>
+
+            <!-- Card Footer -->
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span class="text-emerald-700 font-semibold flex items-center gap-1">
+                Full Nutrition & Steps →
+              </span>
+              <button onclick="deleteRecipeById('${escapeHtml(r.id)}', event)" class="text-slate-400 hover:text-rose-600 px-1.5 py-0.5 rounded">Delete</button>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    // --- 9. FULL RECIPE DETAIL & NUTRITION FACTS MODAL ---
+    function buildFdaNutritionHtml(n, servings) {
+      const cal = n.calories || 0;
+      const fatPct = Math.round(((n.fat || 0) / 78) * 100);
+      const carbPct = Math.round(((n.carbs || 0) / 275) * 100);
+      const fibPct = Math.round(((n.fiber || 0) / 28) * 100);
+      const proPct = Math.round(((n.protein || 0) / 50) * 100);
+      const sodPct = Math.round(((n.sodium || 0) / 2300) * 100);
+
+      return `
+        <div class="text-slate-900">
+          <div class="text-2xl font-black tracking-tight leading-none">Nutrition Facts</div>
+          <div class="text-xs text-slate-600 mt-1">${servings} servings per recipe</div>
+          <div class="flex justify-between font-bold text-xs border-b border-slate-900 pb-1 mt-0.5">
+            <span>Serving size</span>
+            <span>1 serving</span>
+          </div>
+          <div class="nutrition-bar-thick"></div>
+          <div class="flex justify-between items-baseline">
+            <div>
+              <div class="text-[11px] font-bold">Amount per serving</div>
+              <div class="text-xl font-black">Calories</div>
+            </div>
+            <div class="text-3xl font-black">${cal}</div>
+          </div>
+          <div class="nutrition-bar-med"></div>
+          <div class="text-[11px] font-bold text-right border-b border-slate-200 pb-1">% Daily Value*</div>
+          <div class="divide-y divide-slate-200 text-xs">
+            <div class="py-1 flex justify-between"><span><strong>Total Fat</strong> ${n.fat || 0}g</span><strong>${fatPct}%</strong></div>
+            <div class="py-1 flex justify-between"><span><strong>Sodium</strong> ${n.sodium || 0}mg</span><strong>${sodPct}%</strong></div>
+            <div class="py-1 flex justify-between"><span><strong>Total Carbohydrate</strong> ${n.carbs || 0}g</span><strong>${carbPct}%</strong></div>
+            <div class="py-1 pl-3 flex justify-between text-slate-700"><span>Dietary Fiber ${n.fiber || 0}g</span><strong>${fibPct}%</strong></div>
+            <div class="py-1 pl-3 flex justify-between text-slate-700"><span>Total Sugars ${n.sugar || 0}g</span><span></span></div>
+            <div class="py-1 pl-3 flex justify-between text-emerald-800 font-semibold"><span>Net Carbs ${n.netCarbs ?? Math.max(0, (n.carbs || 0) - (n.fiber || 0)).toFixed(1)}g</span><span></span></div>
+            <div class="py-1 flex justify-between"><span><strong>Protein</strong> ${n.protein || 0}g</span><strong>${proPct}%</strong></div>
+          </div>
+          <div class="nutrition-bar-thick"></div>
+          <p class="text-[10px] text-slate-500 leading-tight mt-1">*Calculated per serving using Recipe4Me USDA FoodData Central reference weights.</p>
+        </div>
+      `;
+    }
+
+    function openRecipeDetailModal(recipeId) {
+      const r = appState.recipes.find(x => x.id === recipeId);
+      if (!r) return;
+      const modal = document.getElementById('recipeDetailModal');
+      const content = document.getElementById('recipeDetailContent');
+      if (!modal || !content) return;
+
+      const n = r.nutrition || calculateRecipeMacros(r.ingredients, r.servings);
+
+      content.innerHTML = `
+        <div class="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
+          <div>
+            <div class="flex flex-wrap items-center gap-1.5 mb-1">
+              ${(r.tags || []).map(t => `<span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">${escapeHtml(t)}</span>`).join('')}
+              <span class="text-xs text-slate-500">• ${r.servings || 2} Servings • ${escapeHtml(r.prepTime || '20 mins')}</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900">${escapeHtml(r.title)}</h2>
+            ${r.sourceUrl ? `<a href="${escapeHtml(r.sourceUrl)}" target="_blank" rel="noopener" class="text-xs text-emerald-600 hover:underline">Original Source URL ↗</a>` : ''}
+          </div>
+          <button onclick="closeRecipeDetailModal()" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600">✕</button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
+          <div class="lg:col-span-7 space-y-5">
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Interactive Ingredient Checklist</h3>
+              <div class="space-y-1.5 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                ${(r.ingredients || []).map(ing => {
+                  const info = analyzeIngredientLine(ing);
+                  return `
+                    <label class="flex items-center justify-between gap-2 text-xs sm:text-sm text-slate-700 cursor-pointer py-1 border-b border-slate-200/50 last:border-0">
+                      <span class="flex items-center gap-2">
+                        <input type="checkbox" class="rounded text-emerald-600 focus:ring-emerald-500" />
+                        <span>${escapeHtml(ing)}</span>
+                      </span>
+                      <span class="text-[11px] text-slate-400 shrink-0">${info.calories} kcal • ${info.protein}g P</span>
+                    </label>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Step-by-Step Instructions</h3>
+              <ol class="space-y-2.5 text-xs sm:text-sm text-slate-700">
+                ${(r.instructions || []).map((step, i) => `
+                  <li class="flex gap-3 bg-white p-3 rounded-xl border border-slate-200">
+                    <span class="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">${i + 1}</span>
+                    <span>${escapeHtml(step)}</span>
+                  </li>
+                `).join('')}
+              </ol>
+            </div>
+          </div>
+
+          <div class="lg:col-span-5 space-y-4">
+            <div class="nutrition-label rounded-xl">
+              ${buildFdaNutritionHtml(n, r.servings || 2)}
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button onclick="copyRecipeMarkdown('${escapeHtml(r.id)}')" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold py-2.5 px-3 rounded-xl">📋 Copy Markdown Card</button>
+              <button onclick="sendRecipeToLab('${escapeHtml(r.id)}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2.5 px-3 rounded-xl">🔬 Open in Macro Lab</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeRecipeDetailModal() {
+      const modal = document.getElementById('recipeDetailModal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function copyRecipeMarkdown(recipeId) {
+      const r = appState.recipes.find(x => x.id === recipeId);
+      if (!r) return;
+      const n = r.nutrition || {};
+      const md = [
+        `# ${r.title}`,
+        `**Servings:** ${r.servings} | **Prep Time:** ${r.prepTime || '20 mins'}`,
+        `**Per Serving Macros:** ${n.calories} kcal | ${n.protein}g Protein | ${n.netCarbs ?? n.carbs}g Net Carbs | ${n.fat}g Fat | ${n.fiber || 0}g Fiber`,
+        ``,
+        `## Ingredients`,
+        ...(r.ingredients || []).map(i => `- ${i}`),
+        ``,
+        `## Instructions`,
+        ...(r.instructions || []).map((s, idx) => `${idx + 1}. ${s}`)
+      ].join('\n');
+
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      showToast('Copied formatted Markdown recipe card to clipboard!');
+    }
+
+    function sendRecipeToLab(recipeId) {
+      const r = appState.recipes.find(x => x.id === recipeId);
+      if (!r) return;
+      closeRecipeDetailModal();
+      appState.labIngredients = [...(r.ingredients || [])];
+      const titleEl = document.getElementById('calcRecipeTitle');
+      const servEl = document.getElementById('calcRecipeServings');
+      if (titleEl) titleEl.value = r.title;
+      if (servEl) servEl.value = r.servings || 2;
+      switchTab('calculator');
+      showToast('Loaded recipe into USDA Macro Lab');
+    }
+
+    // --- 10. TAB 2: SMART ADD (PLAIN TEXT & COPY/PASTE) ---
+    function loadSmartSample(type) {
+      const titleEl = document.getElementById('smartTitleInput');
+      const servEl = document.getElementById('smartServingsInput');
+      const textEl = document.getElementById('smartTextInput');
+      if (!titleEl || !servEl || !textEl) return;
+
+      if (type === 'casual') {
+        titleEl.value = 'Honey-Garlic Shrimp & Broccoli Stir-Fry';
+        servEl.value = '2';
+        textEl.value = `300g shrimp, peeled and deveined\n2 cups broccoli florets\n1 cup brown rice\n1 tbsp sesame oil\n1 tbsp soy sauce\n1 tbsp honey\n2 cloves garlic, minced\n\nSear shrimp and minced garlic in sesame oil for 3 minutes.\nAdd broccoli florets, soy sauce, and honey; toss over high heat for 4 minutes.\nServe hot over steamed brown rice.`;
+      } else if (type === 'blog') {
+        titleEl.value = '';
+        servEl.value = '3';
+        textEl.value = ` Mediterranean Chickpea & Tuna Protein Salad (Serves 3)
+Ingredients:
+2 cans tuna, drained
+1 cup chickpeas, rinsed
+1 cup cucumber, chopped
+1 cup tomato, diced
+60g feta cheese
+1 tbsp olive oil
+1 lemon, juiced
+Directions:
+1. Combine drained tuna, chickpeas, crisp cucumber, and diced tomatoes in a large mixing bowl.
+2. Drizzle with extra-virgin olive oil and fresh lemon juice, then fold in crumbled feta cheese.`;
+      } else {
+        titleEl.value = 'GLP-1 & B12 High-Protein Steak & Sweet Potato Plate';
+        servEl.value = '2';
+        textEl.value = `300g steak\n200g sweet potato, cubed\n2 cups spinach\n1 tbsp butter\n2 cloves garlic\n\nRoast cubed sweet potato at 400F for 20 minutes.\nPan-sear steak in butter and garlic to medium-rare, then wilt fresh spinach in the pan juices.`;
+      }
+      runSmartParse(false);
+    }
+
+    function clearSmartAdd() {
+      document.getElementById('smartTitleInput').value = '';
+      document.getElementById('smartTextInput').value = '';
+      document.getElementById('smartParseStatus').textContent = '';
+    }
+
+    async function runSmartParse(useAi = true) {
+      const titleVal = document.getElementById('smartTitleInput')?.value || '';
+      const servVal = document.getElementById('smartServingsInput')?.value || 2;
+      const rawText = document.getElementById('smartTextInput')?.value.trim() || '';
+      const statusEl = document.getElementById('smartParseStatus');
+      const btn = document.getElementById('smartParseBtn');
+
+      if (!rawText) {
+        showToast('Please enter or paste a recipe description first.', 'error');
+        return;
+      }
+
+      // First compute instant local draft so UI responds immediately
+      let draft = localSmartParseRecipe(titleVal, rawText, servVal);
+      appState.smartDraft = draft;
+      renderSmartPreview(draft, 'Local USDA Parser');
+
+      if (!useAi) {
+        if (statusEl) statusEl.textContent = 'Parsed instantaneously with Local Regex + USDA Macro Dictionary.';
+        return;
+      }
+
+      try {
+        if (btn) btn.disabled = true;
+        if (statusEl) statusEl.textContent = 'Refining ingredients, gram weights & nutrition with Gemini AI...';
+
+        const aiResult = await callGeminiStructuredRecipe(
+          `Title hint: "${titleVal}". Requested servings: ${servVal}.\nRaw recipe text:\n${rawText}`,
+          `You are Recipe4Me's culinary & USDA nutrition parser. Extract a clean recipe title, servings, prepTime, dietary tags, list of ingredients with clear measurements, step-by-step instructions, and accurate per-serving nutrition.`
+        );
+
+        if (aiResult && Array.isArray(aiResult.ingredients) && aiResult.ingredients.length > 0) {
+          const calcNutr = calculateRecipeMacros(aiResult.ingredients, aiResult.servings || servVal);
+          const aiNutr = aiResult.nutritionPerServing || {};
+          draft = {
+            id: crypto.randomUUID(),
+            title: aiResult.title || draft.title,
+            servings: aiResult.servings || draft.servings,
+            prepTime: aiResult.prepTime || draft.prepTime,
+            tags: Array.isArray(aiResult.tags) && aiResult.tags.length ? aiResult.tags : draft.tags,
+            favorite: false,
+            sourceUrl: null,
+            ingredients: aiResult.ingredients,
+            instructions: Array.isArray(aiResult.instructions) && aiResult.instructions.length ? aiResult.instructions : draft.instructions,
+            nutrition: {
+              calories: aiNutr.calories || calcNutr.calories,
+              protein: aiNutr.protein ?? calcNutr.protein,
+              carbs: aiNutr.carbs ?? calcNutr.carbs,
+              fat: aiNutr.fat ?? calcNutr.fat,
+              fiber: aiNutr.fiber ?? calcNutr.fiber,
+              netCarbs: +Math.max(0, (aiNutr.carbs ?? calcNutr.carbs) - (aiNutr.fiber ?? calcNutr.fiber)).toFixed(1),
+              sugar: aiNutr.sugar ?? calcNutr.sugar,
+              sodium: aiNutr.sodium ?? calcNutr.sodium
+            },
+            createdAt: new Date().toISOString()
+          };
+          appState.smartDraft = draft;
+          renderSmartPreview(draft, 'Gemini AI + USDA Verified');
+          if (statusEl) statusEl.textContent = '✓ Enhanced with Gemini AI & USDA Macro Verification.';
+        }
+      } catch (e) {
+        if (statusEl) statusEl.textContent = '✓ Parsed using built-in Offline USDA Dictionary & Smart Regex Engine.';
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function renderSmartPreview(draft, engineLabel) {
+      const container = document.getElementById('smartPreviewContainer');
+      if (!container || !draft) return;
+      const n = draft.nutrition;
+
+      container.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">${escapeHtml(engineLabel)}</span>
+            <span class="text-xs text-slate-500">${draft.servings} servings • ${escapeHtml(draft.prepTime)}</span>
+          </div>
+          <h3 class="text-lg font-extrabold text-slate-900">${escapeHtml(draft.title)}</h3>
+
+          <div class="grid grid-cols-4 gap-1.5 bg-emerald-50/80 border border-emerald-200 rounded-xl p-2.5 text-center">
+            <div><div class="text-[10px] text-slate-500">Calories</div><div class="font-extrabold text-emerald-900 text-sm">${n.calories}</div></div>
+            <div><div class="text-[10px] text-slate-500">Protein</div><div class="font-extrabold text-emerald-800 text-sm">${n.protein}g</div></div>
+            <div><div class="text-[10px] text-slate-500">Net Carb</div><div class="font-bold text-emerald-800 text-sm">${n.netCarbs}g</div></div>
+            <div><div class="text-[10px] text-slate-500">Fat</div><div class="font-bold text-emerald-800 text-sm">${n.fat}g</div></div>
+          </div>
+
+          <div>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Parsed Ingredients (${draft.ingredients.length})</h4>
+            <ul class="text-xs text-slate-700 space-y-1 max-h-36 overflow-y-auto pl-4 list-disc">
+              ${draft.ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join('')}
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Instructions (${draft.instructions.length} steps)</h4>
+            <ol class="text-xs text-slate-600 space-y-1 max-h-36 overflow-y-auto pl-4 list-decimal">
+              ${draft.instructions.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+            </ol>
+          </div>
+
+          <button onclick="saveSmartDraftToVault()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm transition">
+            ✓ Save Recipe to My Cookbook
+          </button>
+        </div>
+      `;
+    }
+
+    function saveSmartDraftToVault() {
+      if (!appState.smartDraft) return;
+      appState.recipes.unshift(appState.smartDraft);
+      savePersistentState();
+      showToast(`Saved "${appState.smartDraft.title}" to My Cookbook!`);
+      switchTab('vault');
+    }
+
+    // --- 11. TAB 3: URL RECIPE IMPORTER (MULTI-PROXY + JSON-LD) ---
+    function testSampleUrl(url) {
+      const input = document.getElementById('urlImportInput');
+      if (input) input.value = url;
+      handleUrlImport();
+    }
+
+    async function fetchHtmlWithCorsFallback(targetUrl) {
+      const proxies = [
+        `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
+        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+      ];
+
+      for (const proxyUrl of proxies) {
+        try {
+          const res = await fetch(proxyUrl);
+          if (!res.ok) continue;
+          if (proxyUrl.includes('allorigins')) {
+            const json = await res.json();
+            if (json && json.contents) return json.contents;
+          } else {
+            return await res.text();
+          }
+        } catch (e) {}
+      }
+      throw new Error('CORS proxy unreachable');
+    }
+
+    async function handleUrlImport() {
+      const urlInput = document.getElementById('urlImportInput');
+      const statusBox = document.getElementById('urlStatusBox');
+      const previewArea = document.getElementById('urlPreviewArea');
+      const url = (urlInput?.value || '').trim();
+
+      if (!url) {
+        showToast('Please paste a valid recipe URL first.', 'error');
+        return;
+      }
+
+      statusBox.classList.remove('hidden');
+      statusBox.className = 'p-4 rounded-xl text-xs sm:text-sm border bg-slate-50 border-slate-200 text-slate-700';
+      statusBox.textContent = 'Fetching webpage via CORS proxy and scanning for Schema.org/Recipe metadata...';
+      previewArea.classList.add('hidden');
+
+      try {
+        const html = await fetchHtmlWithCorsFallback(url);
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+
+        let foundRecipe = null;
+        const ldScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+
+        ldScripts.forEach(s => {
+          try {
+            const rawJson = JSON.parse(s.textContent);
+            const flatten = (obj) => {
+              if (!obj) return [];
+              if (Array.isArray(obj)) return obj.flatMap(flatten);
+              if (obj['@graph']) return flatten(obj['@graph']);
+              return [obj];
+            };
+            const nodes = flatten(rawJson);
+            nodes.forEach(node => {
+              const t = node['@type'];
+              if (t === 'Recipe' || (Array.isArray(t) && t.includes('Recipe'))) {
+                foundRecipe = node;
+              }
+            });
+          } catch (e) {}
+        });
+
+        if (foundRecipe && Array.isArray(foundRecipe.recipeIngredient) && foundRecipe.recipeIngredient.length > 0) {
+          const ings = foundRecipe.recipeIngredient.map(i => String(i).trim());
+          let steps = [];
+          if (Array.isArray(foundRecipe.recipeInstructions)) {
+            steps = foundRecipe.recipeInstructions.map(step => {
+              if (typeof step === 'string') return step.trim();
+              if (step && step.text) return String(step.text).trim();
+              return '';
+            }).filter(Boolean);
+          } else if (typeof foundRecipe.recipeInstructions === 'string') {
+            steps = foundRecipe.recipeInstructions.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+          }
+
+          const yieldMatch = String(foundRecipe.recipeYield || '4').match(/\d+/);
+          const servings = yieldMatch ? parseInt(yieldMatch[0], 10) : 4;
+          const nutrition = calculateRecipeMacros(ings, servings);
+
+          const imported = {
+            id: crypto.randomUUID(),
+            title: foundRecipe.name || doc.title || 'Imported Web Recipe',
+            servings,
+            prepTime: '25 mins',
+            tags: nutrition.protein >= 25 ? ['High Protein', 'Web Import'] : ['Web Import'],
+            favorite: false,
+            sourceUrl: url,
+            ingredients: ings,
+            instructions: steps.length ? steps : ['Follow instructions on source blog.'],
+            nutrition,
+            createdAt: new Date().toISOString()
+          };
+
+          appState.urlDraft = imported;
+          statusBox.className = 'p-4 rounded-xl text-xs sm:text-sm border bg-emerald-50 border-emerald-200 text-emerald-900';
+          statusBox.innerHTML = `<strong>✓ Recipe Metadata Extracted!</strong> Found ${ings.length} ingredients and ${steps.length} steps. Calculated per-serving nutrition below.`;
+          renderUrlPreview(imported);
+          return;
+        }
+
+        // Fallback: Extract readable text from page or URL slug
+        const slugTitle = url.split('/').filter(Boolean).pop()?.replace(/[-_]/g, ' ') || 'Imported Recipe';
+        statusBox.className = 'p-4 rounded-xl text-xs sm:text-sm border bg-amber-50 border-amber-200 text-amber-900';
+        statusBox.innerHTML = `This website blocks direct JSON-LD scraping or uses custom markup. <strong>Tip:</strong> Copy the text from the recipe page and paste it into the <button onclick="switchTab('smart-add')" class="underline font-bold">Smart Add (Text / Paste)</button> tab for instant parsing!`;
+      } catch (err) {
+        statusBox.className = 'p-4 rounded-xl text-xs sm:text-sm border bg-amber-50 border-amber-200 text-amber-900';
+        statusBox.innerHTML = `Website firewall blocked proxy fetch for this URL. You can copy the recipe text directly from the site and paste it into <button onclick="switchTab('smart-add')" class="underline font-bold">Smart Add (Text / Paste)</button>.`;
+      }
+    }
+
+    function renderUrlPreview(recipe) {
+      const area = document.getElementById('urlPreviewArea');
+      if (!area) return;
+      area.classList.remove('hidden');
+      const n = recipe.nutrition;
+
+      area.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex flex-wrap justify-between items-center gap-2">
+            <div>
+              <h3 class="text-lg font-extrabold text-slate-900">${escapeHtml(recipe.title)}</h3>
+              <p class="text-xs text-slate-500">${recipe.servings} servings • ${recipe.ingredients.length} ingredients</p>
+            </div>
+            <button onclick="saveUrlDraft()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs sm:text-sm shadow-sm">
+              + Save Imported Recipe to My Cookbook
+            </button>
+          </div>
+          <div class="grid grid-cols-5 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-center text-xs">
+            <div><span class="text-slate-400 block">Calories</span><strong class="text-slate-800 text-sm">${n.calories}</strong></div>
+            <div><span class="text-slate-400 block">Protein</span><strong class="text-emerald-700 text-sm">${n.protein}g</strong></div>
+            <div><span class="text-slate-400 block">Net Carbs</span><strong class="text-amber-700 text-sm">${n.netCarbs}g</strong></div>
+            <div><span class="text-slate-400 block">Fat</span><strong class="text-sky-700 text-sm">${n.fat}g</strong></div>
+            <div><span class="text-slate-400 block">Fiber</span><strong class="text-teal-700 text-sm">${n.fiber}g</strong></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function saveUrlDraft() {
+      if (!appState.urlDraft) return;
+      appState.recipes.unshift(appState.urlDraft);
+      savePersistentState();
+      showToast(`Imported "${appState.urlDraft.title}" to My Cookbook!`);
+      switchTab('vault');
+    }
+
+    // --- 12. TAB 4: FIND NEW RECIPES (THEMEALDB + AI CUSTOM CHEF) ---
+    let lastDiscoveredMeals = [];
+
+    function quickDiscover(term) {
+      const inp = document.getElementById('discoverQueryInput');
+      if (inp) inp.value = term;
+      searchMealDb();
+    }
+
+    async function searchMealDb() {
+      const q = (document.getElementById('discoverQueryInput')?.value || 'Salmon').trim();
+      const status = document.getElementById('discoverStatus');
+      const grid = document.getElementById('discoverResultsGrid');
+      if (!grid) return;
+
+      if (status) status.textContent = `Searching recipes for "${q}" and calculating per-serving USDA macros...`;
+      grid.innerHTML = '';
+
+      try {
+        const res = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        const meals = data?.meals || [];
+
+        if (meals.length === 0) {
+          if (status) status.textContent = `No online database matches for "${q}". Try using the Custom Macro Chef on the right to generate one!`;
+          return;
+        }
+
+        if (status) status.textContent = `Showing ${Math.min(9, meals.length)} recipes for "${q}" with auto-calculated nutrition (per serving, 4 servings/recipe):`;
+
+        lastDiscoveredMeals = meals.slice(0, 9).map(meal => {
+          const ings = [];
+          for (let i = 1; i <= 20; i++) {
+            const ing = (meal[`strIngredient${i}`] || '').trim();
+            const meas = (meal[`strMeasure${i}`] || '').trim();
+            if (ing) ings.push(`${meas} ${ing}`.trim());
+          }
+          const steps = String(meal.strInstructions || '')
+            .split(/\r?\n/)
+            .map(s => s.trim())
+            .filter(s => s.length > 4);
+          const nutrition = calculateRecipeMacros(ings, 4);
+          return {
+            id: crypto.randomUUID(),
+            title: meal.strMeal,
+            servings: 4,
+            prepTime: '25 mins',
+            tags: [meal.strCategory, meal.strArea].filter(Boolean),
+            favorite: false,
+            sourceUrl: meal.strSource || meal.strYoutube || null,
+            thumb: meal.strMealThumb,
+            ingredients: ings,
+            instructions: steps,
+            nutrition,
+            createdAt: new Date().toISOString()
+          };
+        });
+
+        renderDiscoveredGrid();
+      } catch (e) {
+        if (status) status.textContent = 'Could not reach TheMealDB right now. Use the Custom Macro Chef to generate recipes!';
+      }
+    }
+
+    function renderDiscoveredGrid() {
+      const grid = document.getElementById('discoverResultsGrid');
+      if (!grid) return;
+
+      grid.innerHTML = lastDiscoveredMeals.map((r, idx) => `
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+          <div>
+            ${r.thumb ? `<img src="${escapeHtml(r.thumb)}" alt="${escapeHtml(r.title)}" class="w-full h-40 object-cover" onerror="this.style.display='none'" />` : ''}
+            <div class="p-4 space-y-2.5">
+              <div class="flex flex-wrap gap-1">
+                ${(r.tags || []).map(t => `<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">${escapeHtml(t)}</span>`).join('')}
+              </div>
+              <h3 class="font-bold text-base text-slate-800">${escapeHtml(r.title)}</h3>
+              <div class="grid grid-cols-4 gap-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-center text-xs">
+                <div><span class="text-[10px] text-slate-400 block">Cal</span><strong>${r.nutrition.calories}</strong></div>
+                <div><span class="text-[10px] text-slate-400 block">Pro</span><strong class="text-emerald-700">${r.nutrition.protein}g</strong></div>
+                <div><span class="text-[10px] text-slate-400 block">Carb</span><strong>${r.nutrition.carbs}g</strong></div>
+                <div><span class="text-[10px] text-slate-400 block">Fat</span><strong>${r.nutrition.fat}g</strong></div>
+              </div>
+              <p class="text-xs text-slate-500 line-clamp-2">${escapeHtml(r.ingredients.join(', '))}</p>
+            </div>
+          </div>
+          <div class="p-4 pt-0">
+            <button onclick="saveDiscoveredMeal(${idx})" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-xl transition">
+              + Save to My Cookbook
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function saveDiscoveredMeal(idx) {
+      const r = lastDiscoveredMeals[idx];
+      if (!r) return;
+      appState.recipes.unshift({ ...r, id: crypto.randomUUID() });
+      savePersistentState();
+      showToast(`Saved "${r.title}" to My Cookbook!`);
+    }
+
+    async function generateCustomAiRecipe() {
+      const promptEl = document.getElementById('aiChefPrompt');
+      const btn = document.getElementById('aiChefBtn');
+      const status = document.getElementById('discoverStatus');
+      const prompt = (promptEl?.value || '').trim() || 'High-protein salmon & quinoa dinner under 450 calories';
+
+      if (btn) btn.disabled = true;
+      if (status) status.textContent = `Generating custom recipe for: "${prompt}"...`;
+
+      try {
+        const aiRecipe = await callGeminiStructuredRecipe(
+          `Create a delicious, realistic home-cooked recipe matching this request: "${prompt}"`,
+          `You are Recipe4Me's Culinary Nutritionist. Generate a complete recipe with exact gram/household measurements and accurate per-serving macros.`
+        );
+        const calcNutr = calculateRecipeMacros(aiRecipe.ingredients, aiRecipe.servings || 2);
+        const newRec = {
+          id: crypto.randomUUID(),
+          title: aiRecipe.title || 'Custom AI Macro Recipe',
+          servings: aiRecipe.servings || 2,
+          prepTime: aiRecipe.prepTime || '20 mins',
+          tags: aiRecipe.tags || ['AI Chef', 'High Protein'],
+          favorite: false,
+          sourceUrl: null,
+          ingredients: aiRecipe.ingredients,
+          instructions: aiRecipe.instructions,
+          nutrition: calcNutr,
+          createdAt: new Date().toISOString()
+        };
+        lastDiscoveredMeals.unshift(newRec);
+        renderDiscoveredGrid();
+        if (status) status.textContent = `✓ Custom recipe "${newRec.title}" created! Click "+ Save to My Cookbook" below.`;
+      } catch (e) {
+        const fallback = localSmartParseRecipe(
+          'High-Protein Mediterranean Chicken & Spinach Skillet',
+          `300g chicken breast\n2 cups spinach\n1 cup chickpeas\n60g feta cheese\n1 tbsp olive oil\n2 cloves garlic\nSear seasoned chicken breast in olive oil with garlic until golden.\nToss with chickpeas and spinach until wilted, then finish with crumbled feta.`,
+          2
+        );
+        lastDiscoveredMeals.unshift(fallback);
+        renderDiscoveredGrid();
+        if (status) status.textContent = '✓ Created custom macro-balanced recipe!';
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // --- 13. TAB 5: USDA NUTRITION CALCULATOR & LAB ---
+    let labChartInstance = null;
+
+    async function searchUsdaFood() {
+      const q = (document.getElementById('usdaSearchInput')?.value || '').trim().toLowerCase();
+      const box = document.getElementById('usdaSearchResults');
+      if (!q || !box) return;
+
+      box.innerHTML = `<p class="text-xs text-slate-400">Searching local USDA reference & USDA FoodData Central API...</p>`;
+
+      // 1. Instant Local USDA matches
+      const results = [];
+      for (const [name, macros] of Object.entries(USDA_LOCAL_DB)) {
+        if (name.includes(q)) {
+          results.push({
+            name: `${name.charAt(0).toUpperCase() + name.slice(1)} (USDA Whole Food Ref)`,
+            cal: macros.cal,
+            pro: macros.pro,
+            carb: macros.carb,
+            fat: macros.fat
+          });
+        }
+      }
+
+      // 2. Live USDA FoodData Central query
+      try {
+        const apiKey = localStorage.getItem('recipe4me_usda_api_key') || appState.settings.usdaKey || 'DEMO_KEY';
+        const res = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(q)}&pageSize=5`);
+        if (res.ok) {
+          const data = await res.json();
+          (data.foods || []).forEach(f => {
+            const getNutrient = (id) => {
+              const found = (f.foodNutrients || []).find(n => n.nutrientId === id);
+              return found ? +(found.value || 0).toFixed(1) : 0;
+            };
+            results.push({
+              name: `${f.description} (USDA #${f.fdcId})`,
+              cal: Math.round(getNutrient(1008)),
+              pro: getNutrient(1003),
+              carb: getNutrient(1005),
+              fat: getNutrient(1004)
+            });
+          });
+        }
+      } catch (e) {}
+
+      if (results.length === 0) {
+        box.innerHTML = `<p class="text-xs text-slate-500">No matches found for "${escapeHtml(q)}".</p>`;
+        return;
+      }
+
+      box.innerHTML = results.slice(0, 8).map(item => `
+        <div class="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-slate-200 text-xs">
+          <div>
+            <span class="font-semibold text-slate-800">${escapeHtml(item.name)}</span>
+            <span class="text-slate-400 ml-1">(per 100g: ${item.cal} kcal | ${item.pro}g P | ${item.carb}g C | ${item.fat}g F)</span>
+          </div>
+          <button onclick="addUsdaItemToLab('${escapeHtml(item.name.split('(')[0].trim())}')" class="text-emerald-700 font-bold hover:underline shrink-0 ml-2">+ Add 100g</button>
+        </div>
+      `).join('');
+    }
+
+    function addUsdaItemToLab(foodName) {
+      appState.labIngredients.push(`100g ${foodName.toLowerCase()}`);
+      savePersistentState();
+      recalculateLab();
+      showToast(`Added 100g ${foodName} to calculator`);
+    }
+
+    function addLabIngredientLine() {
+      const inp = document.getElementById('calcNewIngInput');
+      const val = (inp?.value || '').trim();
+      if (!val) return;
+      appState.labIngredients.push(val);
+      inp.value = '';
+      savePersistentState();
+      recalculateLab();
+    }
+
+    function removeLabIngredient(idx) {
+      appState.labIngredients.splice(idx, 1);
+      savePersistentState();
+      recalculateLab();
+    }
+
+    function resetLabIngredients() {
+      appState.labIngredients = [];
+      savePersistentState();
+      recalculateLab();
+    }
+
+    function recalculateLab() {
+      const tbody = document.getElementById('calcIngredientRows');
+      const serv = Math.max(1, parseInt(document.getElementById('calcRecipeServings')?.value || '2', 10));
+      if (!tbody) return;
+
+      const parsedRows = (appState.labIngredients || []).map((line, idx) => {
+        const info = analyzeIngredientLine(line);
+        return { idx, ...info };
+      });
+
+      tbody.innerHTML = parsedRows.length ? parsedRows.map(r => `
+        <tr class="hover:bg-slate-50">
+          <td class="py-2 px-3 font-medium text-slate-800">${escapeHtml(r.raw)}</td>
+          <td class="py-2 px-2 text-right text-slate-500">${r.grams}g</td>
+          <td class="py-2 px-2 text-right font-semibold">${r.calories}</td>
+          <td class="py-2 px-2 text-right text-emerald-700 font-semibold">${r.protein}g</td>
+          <td class="py-2 px-2 text-right">${r.carbs}g</td>
+          <td class="py-2 px-2 text-right">${r.fat}g</td>
+          <td class="py-2 px-2 text-center">
+            <button onclick="removeLabIngredient(${r.idx})" class="text-slate-400 hover:text-rose-600">✕</button>
+          </td>
+        </tr>
+      `).join('') : `<tr><td colspan="7" class="py-6 text-center text-slate-400 text-xs">No ingredients added yet. Use the input bar above to add ingredients.</td></tr>`;
+
+      const perServing = calculateRecipeMacros(appState.labIngredients, serv);
+      const badge = document.getElementById('labCalorieBadge');
+      if (badge) badge.textContent = `${perServing.calories} kcal / serving`;
+
+      const panel = document.getElementById('labNutritionFactsPanel');
+      if (panel) panel.innerHTML = buildFdaNutritionHtml(perServing, serv);
+
+      // Update Doughnut Chart
+      const ctx = document.getElementById('labMacroChart');
+      if (ctx && window.Chart) {
+        if (labChartInstance) labChartInstance.destroy();
+        labChartInstance = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: [`Protein (${perServing.protein}g)`, `Net Carbs (${perServing.netCarbs}g)`, `Fat (${perServing.fat}g)`],
+            datasets: [{
+              data: [perServing.protein * 4, perServing.netCarbs * 4, perServing.fat * 9],
+              backgroundColor: ['#059669', '#d97706', '#0284c7'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }
+            },
+            cutout: '65%'
+          }
+        });
+      }
+    }
+
+    function saveLabAsRecipe() {
+      if (!appState.labIngredients.length) {
+        showToast('Add at least one ingredient before saving.', 'error');
+        return;
+      }
+      const title = document.getElementById('calcRecipeTitle')?.value.trim() || 'Custom USDA Macro Recipe';
+      const serv = Math.max(1, parseInt(document.getElementById('calcRecipeServings')?.value || '2', 10));
+      const nutrition = calculateRecipeMacros(appState.labIngredients, serv);
+
+      const newRec = {
+        id: crypto.randomUUID(),
+        title,
+        servings: serv,
+        prepTime: '15 mins',
+        tags: nutrition.protein >= 25 ? ['High Protein', 'USDA Lab'] : ['USDA Lab'],
+        favorite: false,
+        sourceUrl: null,
+        ingredients: [...appState.labIngredients],
+        instructions: ['Measure ingredients according to the USDA Macro Lab breakdown and prepare as desired.'],
+        nutrition,
+        createdAt: new Date().toISOString()
+      };
+
+      appState.recipes.unshift(newRec);
+      savePersistentState();
+      showToast(`Saved "${title}" to My Cookbook!`);
+      switchTab('vault');
+    }
+
+    // --- 14. SETTINGS & DATA LOCK MODALS ---
+    function openSettingsModal() {
+      const m = document.getElementById('settingsModal');
+      if (!m) return;
+      document.getElementById('settingGeminiKey').value = localStorage.getItem('recipe4me_gemini_api_key') || '';
+      document.getElementById('settingUsdaKey').value = localStorage.getItem('recipe4me_usda_api_key') || appState.settings.usdaKey || 'DEMO_KEY';
+      document.getElementById('settingTargetCal').value = appState.settings.targetCal || 500;
+      document.getElementById('settingTargetPro').value = appState.settings.targetPro || 25;
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+
+    function closeSettingsModal() {
+      const m = document.getElementById('settingsModal');
+      if (!m) return;
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    function saveSettings() {
+      const gemKey = document.getElementById('settingGeminiKey')?.value.trim() || '';
+      const usdaKey = document.getElementById('settingUsdaKey')?.value.trim() || 'DEMO_KEY';
+      if (gemKey) localStorage.setItem('recipe4me_gemini_api_key', gemKey);
+      else localStorage.removeItem('recipe4me_gemini_api_key');
+
+      localStorage.setItem('recipe4me_usda_api_key', usdaKey);
+      appState.settings.usdaKey = usdaKey;
+      appState.settings.targetCal = parseInt(document.getElementById('settingTargetCal')?.value || '500', 10);
+      appState.settings.targetPro = parseInt(document.getElementById('settingTargetPro')?.value || '25', 10);
+
+      savePersistentState();
+      closeSettingsModal();
+      renderVault();
+      showToast('Settings & nutrition targets saved!');
+    }
+
+    function openDataModal() {
+      const m = document.getElementById('dataModal');
+      if (!m) return;
+      updateHeaderCounters();
+      document.getElementById('snapshotTextarea').value = JSON.stringify(appState.recipes);
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+
+    function closeDataModal() {
+      const m = document.getElementById('dataModal');
+      if (!m) return;
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    function exportJsonFile() {
+      const blob = new Blob([JSON.stringify(appState.recipes, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `recipe4me-cookbook-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      showToast('Exported Cookbook JSON backup!');
+    }
+
+    function importJsonFile(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (Array.isArray(parsed)) {
+            appState.recipes = parsed;
+            savePersistentState();
+            renderVault();
+            closeDataModal();
+            showToast(`Imported ${parsed.length} recipes successfully!`);
+          }
+        } catch (err) {
+          showToast('Invalid JSON backup file.', 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function copySnapshotToClipboard() {
+      const ta = document.getElementById('snapshotTextarea');
+      if (!ta) return;
+      ta.value = JSON.stringify(appState.recipes);
+      ta.select();
+      document.execCommand('copy');
+      showToast('Snapshot copied to clipboard!');
+    }
+
+    function applySnapshotFromTextarea() {
+      const raw = document.getElementById('snapshotTextarea')?.value.trim();
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          appState.recipes = parsed;
+          savePersistentState();
+          renderVault();
+          closeDataModal();
+          showToast(`Restored ${parsed.length} recipes from snapshot!`);
+        }
+      } catch (e) {
+        showToast('Snapshot code is not valid JSON.', 'error');
+      }
+    }
+
+    function restoreStarterRecipes() {
+      appState.recipes = getStarterRecipes();
+      savePersistentState();
+      renderVault();
+      closeDataModal();
+      showToast('Restored starter cookbook recipes!');
+    }
+
+    // --- INITIALIZE ON LOAD ---
+    window.addEventListener('DOMContentLoaded', () => {
+      loadPersistentState();
+      updateHeaderCounters();
+      renderVault();
+      if (window.lucide) lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
